@@ -102,6 +102,7 @@ func importItem(item scrivItem, dataPath string) (Document, error) {
 		if err != nil {
 			return Document{}, fmt.Errorf("scriv: error reading RTF for %s: %w", item.UUID, err)
 		}
+		astDoc = cleanDocument(astDoc)
 		astDoc.Meta.Title = item.Title
 		doc.Doc = astDoc
 	}
