@@ -53,7 +53,8 @@ func writeNode(n ast.Node) string {
 	case ast.NodeList:
 		return writeList(n)
 	case ast.NodeListItem:
-		return writeChildren(n)
+		indent := strings.Repeat("  ", n.Level)
+		return indent + "- " + writeChildren(n)
 	default:
 		return writeChildren(n)
 	}

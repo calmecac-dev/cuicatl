@@ -40,7 +40,9 @@ type converterState struct {
 	underline    bool
 	strike       bool
 	ignore       bool
-	outlineLevel int // -1 = normal paragraph
+	outlineLevel int
+	listID       int
+	listLevel    int
 }
 
 type converter struct {
@@ -50,6 +52,7 @@ type converter struct {
 	cur          converterState
 	paragraphBuf []ast.Node
 	doc          ast.Document
+	pendingFlush bool
 }
 
 func (c *converter) convert() (ast.Document, error) {
@@ -59,7 +62,8 @@ func (c *converter) convert() (ast.Document, error) {
 			c.stateStack = append(c.stateStack, c.cur)
 		case tokenGroupClose:
 			if len(c.stateStack) > 0 {
-				c.cur = c.stateStack[len(c.stateStack)-1]
+				prev := c.stateStack[len(c.stateStack)-1]
+				c.cur = prev
 				c.stateStack = c.stateStack[:len(c.stateStack)-1]
 			}
 		case tokenControl:
@@ -75,6 +79,7 @@ func (c *converter) convert() (ast.Document, error) {
 		}
 	}
 	c.flushParagraph()
+	c.doc = groupListItems(c.doc)
 	return c.doc, nil
 }
 
@@ -94,9 +99,12 @@ func (c *converter) handleControl(tok token) {
 		c.cur.strike = paramIsOn(tok)
 	case "par":
 		c.flushParagraph()
+		c.pendingFlush = false
 	case "pard":
-		c.flushParagraph()
+		c.pendingFlush = true
 		c.cur.outlineLevel = -1
+		c.cur.listID = 0
+		c.cur.listLevel = 0
 	case "line":
 		c.paragraphBuf = append(c.paragraphBuf, ast.Node{Type: ast.NodeLineBreak})
 	case "u":
@@ -110,6 +118,14 @@ func (c *converter) handleControl(tok token) {
 	case "fonttbl", "colortbl", "stylesheet", "info",
 		"pict", "object", "fldinst", "fldrslt", "listtext":
 		c.cur.ignore = true
+	case "ls":
+		if tok.hasParam {
+			c.cur.listID = tok.param
+		}
+	case "ilvl":
+		if tok.hasParam {
+			c.cur.listLevel = tok.param
+		}
 	case "plain":
 		c.cur.bold = false
 		c.cur.italic = false
@@ -125,6 +141,10 @@ func (c *converter) handleControl(tok token) {
 func (c *converter) handleText(value string) {
 	if strings.TrimSpace(value) == "" {
 		return
+	}
+	if c.pendingFlush {
+		c.flushParagraph()
+		c.pendingFlush = false
 	}
 	node := ast.Text(value)
 	if c.cur.strike {
@@ -149,6 +169,12 @@ func (c *converter) flushParagraph() {
 	var node ast.Node
 	if c.cur.outlineLevel >= 0 {
 		node = ast.Heading(c.cur.outlineLevel+1, c.paragraphBuf...)
+	} else if c.cur.listID > 0 {
+		node = ast.Node{
+			Type:     ast.NodeListItem,
+			Level:    c.cur.listLevel,
+			Children: c.paragraphBuf,
+		}
 	} else {
 		node = ast.Paragraph(c.paragraphBuf...)
 	}
@@ -161,4 +187,29 @@ func paramIsOn(tok token) bool {
 		return true
 	}
 	return tok.param != 0
+}
+
+func groupListItems(doc ast.Document) ast.Document {
+	doc.Children = groupNodes(doc.Children)
+	return doc
+}
+
+func groupNodes(nodes []ast.Node) []ast.Node {
+	var result []ast.Node
+	i := 0
+	for i < len(nodes) {
+		if nodes[i].Type == ast.NodeListItem {
+			// recolectar items consecutivos del mismo nivel
+			list := ast.Node{Type: ast.NodeList}
+			for i < len(nodes) && nodes[i].Type == ast.NodeListItem {
+				list.Children = append(list.Children, nodes[i])
+				i++
+			}
+			result = append(result, list)
+		} else {
+			result = append(result, nodes[i])
+			i++
+		}
+	}
+	return result
 }
