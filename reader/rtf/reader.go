@@ -106,6 +106,11 @@ func (c *converter) handleControl(tok token) {
 	case "fonttbl", "colortbl", "stylesheet", "info",
 		"pict", "object", "fldinst", "fldrslt":
 		c.cur.ignore = true
+	case "plain":
+		c.cur.bold = false
+		c.cur.italic = false
+		c.cur.underline = false
+		c.cur.strike = false
 	}
 }
 
