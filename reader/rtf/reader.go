@@ -28,18 +28,19 @@ func ReadWithOptions(data []byte, opts Options) (ast.Document, error) {
 	if err != nil {
 		return ast.Document{}, err
 	}
-	c := &converter{tokens: tokens, opts: opts}
+	c := &converter{tokens: tokens, opts: opts, cur: converterState{outlineLevel: -1}}
 	return c.convert()
 }
 
 // --- converter: tokens → ast.Document ---
 
 type converterState struct {
-	bold      bool
-	italic    bool
-	underline bool
-	strike    bool
-	ignore    bool
+	bold         bool
+	italic       bool
+	underline    bool
+	strike       bool
+	ignore       bool
+	outlineLevel int // -1 = normal paragraph
 }
 
 type converter struct {
@@ -91,8 +92,11 @@ func (c *converter) handleControl(tok token) {
 		c.cur.underline = false
 	case "strike", "striked":
 		c.cur.strike = paramIsOn(tok)
-	case "par", "pard":
+	case "par":
 		c.flushParagraph()
+	case "pard":
+		c.flushParagraph()
+		c.cur.outlineLevel = -1
 	case "line":
 		c.paragraphBuf = append(c.paragraphBuf, ast.Node{Type: ast.NodeLineBreak})
 	case "u":
@@ -111,6 +115,10 @@ func (c *converter) handleControl(tok token) {
 		c.cur.italic = false
 		c.cur.underline = false
 		c.cur.strike = false
+	case "outlineLevel":
+		if tok.hasParam {
+			c.cur.outlineLevel = tok.param
+		}
 	}
 }
 
@@ -138,7 +146,13 @@ func (c *converter) flushParagraph() {
 	if len(c.paragraphBuf) == 0 {
 		return
 	}
-	c.doc.Children = append(c.doc.Children, ast.Paragraph(c.paragraphBuf...))
+	var node ast.Node
+	if c.cur.outlineLevel >= 0 {
+		node = ast.Heading(c.cur.outlineLevel+1, c.paragraphBuf...)
+	} else {
+		node = ast.Paragraph(c.paragraphBuf...)
+	}
+	c.doc.Children = append(c.doc.Children, node)
 	c.paragraphBuf = nil
 }
 
