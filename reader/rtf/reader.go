@@ -103,6 +103,9 @@ func (c *converter) handleControl(tok token) {
 			}
 			c.handleText(string(r))
 		}
+	case "fonttbl", "colortbl", "stylesheet", "info",
+		"pict", "object", "fldinst", "fldrslt":
+		c.cur.ignore = true
 	}
 }
 
