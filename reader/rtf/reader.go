@@ -104,7 +104,7 @@ func (c *converter) handleControl(tok token) {
 			c.handleText(string(r))
 		}
 	case "fonttbl", "colortbl", "stylesheet", "info",
-		"pict", "object", "fldinst", "fldrslt":
+		"pict", "object", "fldinst", "fldrslt", "listtext":
 		c.cur.ignore = true
 	case "plain":
 		c.cur.bold = false
