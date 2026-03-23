@@ -52,53 +52,47 @@ type scrivMeta struct {
 }
 
 // Import reads a .scriv project and returns a Project.
-func Import(scrivPath string) (Project, error) {
+func Import(scrivPath string, imageHandler func([]byte, string) (string, error)) (Project, error) {
 	scrivxPath, err := findScrivx(scrivPath)
 	if err != nil {
 		return Project{}, err
 	}
-
 	data, err := os.ReadFile(scrivxPath)
 	if err != nil {
 		return Project{}, fmt.Errorf("scriv: cannot read %s: %w", scrivxPath, err)
 	}
-
 	var root scrivxRoot
 	if err := xml.Unmarshal(data, &root); err != nil {
 		return Project{}, fmt.Errorf("scriv: invalid XML: %w", err)
 	}
-
 	projectName := strings.TrimSuffix(filepath.Base(scrivxPath), ".scrivx")
 	dataPath := filepath.Join(scrivPath, "Files", "Data")
-
 	project := Project{Title: projectName}
 	for _, item := range root.Binder.Items {
-		// Skip trash
 		if item.Type == "TrashFolder" {
 			continue
 		}
-		doc, err := importItem(item, dataPath)
+		doc, err := importItem(item, dataPath, imageHandler)
 		if err != nil {
 			return Project{}, err
 		}
 		project.Documents = append(project.Documents, doc)
 	}
-
 	return project, nil
 }
 
-func importItem(item scrivItem, dataPath string) (Document, error) {
+func importItem(item scrivItem, dataPath string, imageHandler func([]byte, string) (string, error)) (Document, error) {
 	doc := Document{
 		UUID:             item.UUID,
 		Title:            item.Title,
 		Type:             item.Type,
 		IncludeInCompile: item.MetaData.IncludeInCompile != "No",
 	}
-
-	// RTF lives at Files/Data/<UUID>/content.rtf
 	rtfPath := filepath.Join(dataPath, item.UUID, "content.rtf")
 	if data, err := os.ReadFile(rtfPath); err == nil {
-		astDoc, err := rtf.Read(data)
+		astDoc, err := rtf.ReadWithOptions(data, rtf.Options{
+			ImageHandler: imageHandler,
+		})
 		if err != nil {
 			return Document{}, fmt.Errorf("scriv: error reading RTF for %s: %w", item.UUID, err)
 		}
@@ -106,16 +100,13 @@ func importItem(item scrivItem, dataPath string) (Document, error) {
 		astDoc.Meta.Title = item.Title
 		doc.Doc = astDoc
 	}
-
-	// Recurse into children
 	for _, child := range item.Children {
-		childDoc, err := importItem(child, dataPath)
+		childDoc, err := importItem(child, dataPath, imageHandler)
 		if err != nil {
 			return Document{}, err
 		}
 		doc.Children = append(doc.Children, childDoc)
 	}
-
 	return doc, nil
 }
 

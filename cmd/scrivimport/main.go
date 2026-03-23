@@ -14,7 +14,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	project, err := scriv.Import(os.Args[1])
+	project, err := scriv.Import(os.Args[1], nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error importando proyecto: %v\n", err)
 		os.Exit(1)

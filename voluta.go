@@ -1,5 +1,3 @@
-// Package voluta provides a high-level API for reading and converting
-// creative writing document formats.
 package voluta
 
 import (
@@ -10,6 +8,7 @@ import (
 
 	"github.com/calmecac-dev/voluta/ast"
 	rtfreader "github.com/calmecac-dev/voluta/reader/rtf"
+	"github.com/calmecac-dev/voluta/scriv"
 	htmlwriter "github.com/calmecac-dev/voluta/writer/html"
 	markdownwriter "github.com/calmecac-dev/voluta/writer/markdown"
 )
@@ -31,7 +30,6 @@ type ReadOptions struct {
 	// ImageDir is the directory where images will be saved.
 	// If empty, images are skipped.
 	ImageDir string
-
 	// ImageHandler provides full control over image saving.
 	// If defined, takes precedence over ImageDir.
 	ImageHandler func(data []byte, format string) (string, error)
@@ -43,12 +41,10 @@ func Read(format Format, data []byte, opts ...ReadOptions) (ast.Document, error)
 	if len(opts) > 0 {
 		o = opts[0]
 	}
-
 	handler := o.ImageHandler
 	if handler == nil && o.ImageDir != "" {
 		handler = defaultImageHandler(o.ImageDir)
 	}
-
 	switch format {
 	case FormatRTF:
 		return rtfreader.ReadWithOptions(data, rtfreader.Options{
@@ -83,6 +79,25 @@ func Convert(from, to Format, data []byte, opts ...ReadOptions) ([]byte, error) 
 		return nil, err
 	}
 	return Write(to, doc)
+}
+
+// ScrivProject represents an imported Scrivener project.
+type ScrivProject = scriv.Project
+
+// ScrivDocument represents a single document in a Scrivener project.
+type ScrivDocument = scriv.Document
+
+// ImportScriv imports a Scrivener project from a .scriv directory.
+func ImportScriv(path string, opts ...ReadOptions) (ScrivProject, error) {
+	var o ReadOptions
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+	handler := o.ImageHandler
+	if handler == nil && o.ImageDir != "" {
+		handler = defaultImageHandler(o.ImageDir)
+	}
+	return scriv.Import(path, handler)
 }
 
 func defaultImageHandler(dir string) func([]byte, string) (string, error) {
