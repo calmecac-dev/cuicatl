@@ -54,7 +54,11 @@ func writeNode(n ast.Node) string {
 		return writeList(n)
 	case ast.NodeListItem:
 		indent := strings.Repeat("  ", n.Level)
-		return indent + "- " + writeChildren(n)
+		marker := n.Value
+		if marker == "" {
+			marker = "-"
+		}
+		return indent + marker + " " + writeChildren(n)
 	default:
 		return writeChildren(n)
 	}
@@ -70,16 +74,11 @@ func writeChildren(n ast.Node) string {
 
 func writeList(n ast.Node) string {
 	var lines []string
-	for i, item := range n.Children {
+	for _, item := range n.Children {
 		if item.Type != ast.NodeListItem {
 			continue
 		}
-		prefix := "- "
-		if n.Attrs["ordered"] == "true" {
-			prefix = strings.Repeat(" ", n.Level*2) +
-				string(rune('1'+i)) + ". "
-		}
-		lines = append(lines, prefix+writeChildren(item))
+		lines = append(lines, writeNode(item))
 	}
 	return strings.Join(lines, "\n")
 }

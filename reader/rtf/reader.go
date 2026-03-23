@@ -8,12 +8,8 @@ import (
 
 // Options configures the RTF reader behavior.
 type Options struct {
-	// UnderlineAsHTML wraps underlined text in <u> instead of ignoring it.
 	UnderlineAsHTML bool
-	// ImageHandler is called with the bytes of each image found.
-	// It should return the path or URL to use in the ast.NodeImage.
-	// If nil, images are skipped.
-	ImageHandler func(data []byte, format string) (string, error)
+	ImageHandler    func(data []byte, format string) (string, error)
 }
 
 // Read converts RTF data to an ast.Document using default options.
@@ -23,70 +19,133 @@ func Read(data []byte) (ast.Document, error) {
 
 // ReadWithOptions converts RTF data to an ast.Document with custom options.
 func ReadWithOptions(data []byte, opts Options) (ast.Document, error) {
-	l := newLexer(data)
-	tokens, err := l.tokenize()
+	tokens, err := Tokenize(data)
 	if err != nil {
 		return ast.Document{}, err
 	}
-	c := &converter{tokens: tokens, opts: opts, cur: converterState{outlineLevel: -1}}
-	return c.convert()
-}
-
-// --- converter: tokens → ast.Document ---
-
-type converterState struct {
-	bold         bool
-	italic       bool
-	underline    bool
-	strike       bool
-	ignore       bool
-	outlineLevel int
-	listID       int
-	listLevel    int
-}
-
-type converter struct {
-	tokens       []token
-	opts         Options
-	stateStack   []converterState
-	cur          converterState
-	paragraphBuf []ast.Node
-	doc          ast.Document
-	pendingFlush bool
-}
-
-func (c *converter) convert() (ast.Document, error) {
-	for _, tok := range c.tokens {
-		switch tok.kind {
-		case tokenGroupOpen:
-			c.stateStack = append(c.stateStack, c.cur)
-		case tokenGroupClose:
-			if len(c.stateStack) > 0 {
-				prev := c.stateStack[len(c.stateStack)-1]
-				c.cur = prev
-				c.stateStack = c.stateStack[:len(c.stateStack)-1]
-			}
-		case tokenControl:
-			if c.cur.ignore {
-				continue
-			}
-			c.handleControl(tok)
-		case tokenText:
-			if c.cur.ignore {
-				continue
-			}
-			c.handleText(tok.value)
-		}
-	}
-	c.flushParagraph()
+	c := newConverter(opts)
+	c.processTokens(tokens)
+	c.flush()
 	c.doc = groupListItems(c.doc)
 	return c.doc, nil
 }
 
-func (c *converter) handleControl(tok token) {
-	switch tok.value {
-	case "*":
-		c.cur.ignore = true
+// --- Properties: formatting state for the current group ---
+
+type properties struct {
+	bold         bool
+	italic       bool
+	underline    bool
+	strike       bool
+	outlineLevel int // -1 = normal paragraph
+	listID       int // 0 = not a list
+	listLevel    int
+}
+
+func defaultProperties() properties {
+	return properties{outlineLevel: -1}
+}
+
+// --- List stack ---
+
+type listItem struct {
+	listID    int
+	listLevel int
+	marker    string
+	nodes     []ast.Node
+}
+
+// --- Converter ---
+
+type converter struct {
+	opts         Options
+	propStack    []properties
+	cur          properties
+	paragraphBuf []ast.Node
+	doc          ast.Document
+	listStack    []listItem
+	nextMarker   string
+}
+
+func newConverter(opts Options) *converter {
+	return &converter{
+		opts: opts,
+		cur:  defaultProperties(),
+	}
+}
+
+func (c *converter) pushGroup() {
+	c.propStack = append(c.propStack, c.cur)
+}
+
+func (c *converter) popGroup() {
+	if len(c.propStack) > 0 {
+		c.cur = c.propStack[len(c.propStack)-1]
+		c.propStack = c.propStack[:len(c.propStack)-1]
+	}
+}
+
+// processTokens processes a flat list of tokens at the current group level.
+func (c *converter) processTokens(tokens []Token) {
+	for i := 0; i < len(tokens); i++ {
+		tok := tokens[i]
+		switch tok.Kind {
+		case TokenGroup:
+			c.processGroup(tok.Children)
+		case TokenControlWord:
+			c.handleControl(tok)
+		case TokenControlSymbol:
+			c.handleSymbol(tok.Value)
+		case TokenText:
+			c.handleText(tok.Value)
+		}
+	}
+}
+
+// processGroup handles a { ... } group, identifying special groups by
+// their first token — exactly like Pandoc does.
+func (c *converter) processGroup(children []Token) {
+	if len(children) == 0 {
+		return
+	}
+
+	first := children[0]
+
+	// Extension group {\* ...} — identify by content
+	if first.Kind == TokenControlSymbol && first.Value == "*" {
+		// ignored extension group — check for pntext inside
+		return
+	}
+
+	// {\pntext ...} — list marker group
+	if first.Kind == TokenControlWord && first.Value == "pntext" {
+		c.nextMarker = extractText(children[1:])
+		return
+	}
+
+	// Ignored metadata/formatting groups
+	if first.Kind == TokenControlWord {
+		switch first.Value {
+		case "fonttbl", "colortbl", "stylesheet", "info",
+			"listtable", "listoverridetable",
+			"pict", "object", "fldinst", "fldrslt",
+			"pgdsc", "wgrffmtfilter", "themedata",
+			"colorschememapping", "datastore", "latentstyles",
+			"pntxta", "pntxtb", "xmlnstbl", "filetbl",
+			"expandedcolortbl", "revtbl", "header", "footer",
+			"headerl", "headerr", "footerr", "footerl":
+			return
+		}
+	}
+
+	// Normal group — inherit current properties, process children, restore
+	c.pushGroup()
+	c.processTokens(children)
+	c.popGroup()
+}
+
+func (c *converter) handleControl(tok Token) {
+	switch tok.Value {
 	case "b":
 		c.cur.bold = paramIsOn(tok)
 	case "i":
@@ -99,52 +158,60 @@ func (c *converter) handleControl(tok token) {
 		c.cur.strike = paramIsOn(tok)
 	case "par":
 		c.flushParagraph()
-		c.pendingFlush = false
 	case "pard":
-		c.pendingFlush = true
+		c.flushParagraph()
 		c.cur.outlineLevel = -1
 		c.cur.listID = 0
 		c.cur.listLevel = 0
 	case "line":
 		c.paragraphBuf = append(c.paragraphBuf, ast.Node{Type: ast.NodeLineBreak})
 	case "u":
-		if tok.hasParam {
-			r := rune(tok.param)
+		if tok.HasParam {
+			r := rune(tok.Param)
 			if r < 0 {
 				r += 65536
 			}
 			c.handleText(string(r))
 		}
-	case "fonttbl", "colortbl", "stylesheet", "info",
-		"pict", "object", "fldinst", "fldrslt", "listtext":
-		c.cur.ignore = true
 	case "ls":
-		if tok.hasParam {
-			c.cur.listID = tok.param
+		if tok.HasParam {
+			c.cur.listID = tok.Param
 		}
 	case "ilvl":
-		if tok.hasParam {
-			c.cur.listLevel = tok.param
+		if tok.HasParam {
+			c.cur.listLevel = tok.Param
 		}
 	case "plain":
-		c.cur.bold = false
-		c.cur.italic = false
-		c.cur.underline = false
-		c.cur.strike = false
-	case "outlineLevel":
-		if tok.hasParam {
-			c.cur.outlineLevel = tok.param
+		ol := c.cur.outlineLevel
+		lid := c.cur.listID
+		ll := c.cur.listLevel
+		c.cur = defaultProperties()
+		c.cur.outlineLevel = ol
+		c.cur.listID = lid
+		c.cur.listLevel = ll
+	case "outlinelevel":
+		if tok.HasParam {
+			c.cur.outlineLevel = tok.Param
 		}
+	case "listtext":
+		// old-style list marker — handled as group in processGroup
+	}
+}
+
+func (c *converter) handleSymbol(sym string) {
+	switch sym {
+	case "-":
+		c.handleText("\u00ad") // soft hyphen
+	case "~":
+		c.handleText("\u00a0") // non-breaking space
+	case "_":
+		c.handleText("\u2011") // non-breaking hyphen
 	}
 }
 
 func (c *converter) handleText(value string) {
 	if strings.TrimSpace(value) == "" {
 		return
-	}
-	if c.pendingFlush {
-		c.flushParagraph()
-		c.pendingFlush = false
 	}
 	node := ast.Text(value)
 	if c.cur.strike {
@@ -170,11 +237,17 @@ func (c *converter) flushParagraph() {
 	if c.cur.outlineLevel >= 0 {
 		node = ast.Heading(c.cur.outlineLevel+1, c.paragraphBuf...)
 	} else if c.cur.listID > 0 {
+		marker := c.nextMarker
+		if marker == "" {
+			marker = "-"
+		}
 		node = ast.Node{
 			Type:     ast.NodeListItem,
+			Value:    marker,
 			Level:    c.cur.listLevel,
 			Children: c.paragraphBuf,
 		}
+		c.nextMarker = ""
 	} else {
 		node = ast.Paragraph(c.paragraphBuf...)
 	}
@@ -182,11 +255,33 @@ func (c *converter) flushParagraph() {
 	c.paragraphBuf = nil
 }
 
-func paramIsOn(tok token) bool {
-	if !tok.hasParam {
+func (c *converter) flush() {
+	c.flushParagraph()
+}
+
+// extractText recursively collects visible text from a token list,
+// used to extract list markers from {\pntext} groups.
+func extractText(tokens []Token) string {
+	var sb strings.Builder
+	for _, tok := range tokens {
+		switch tok.Kind {
+		case TokenText:
+			t := strings.TrimSpace(tok.Value)
+			if t != "" && t != "\t" {
+				sb.WriteString(t)
+			}
+		case TokenGroup:
+			sb.WriteString(extractText(tok.Children))
+		}
+	}
+	return sb.String()
+}
+
+func paramIsOn(tok Token) bool {
+	if !tok.HasParam {
 		return true
 	}
-	return tok.param != 0
+	return tok.Param != 0
 }
 
 func groupListItems(doc ast.Document) ast.Document {
@@ -199,7 +294,6 @@ func groupNodes(nodes []ast.Node) []ast.Node {
 	i := 0
 	for i < len(nodes) {
 		if nodes[i].Type == ast.NodeListItem {
-			// recolectar items consecutivos del mismo nivel
 			list := ast.Node{Type: ast.NodeList}
 			for i < len(nodes) && nodes[i].Type == ast.NodeListItem {
 				list.Children = append(list.Children, nodes[i])

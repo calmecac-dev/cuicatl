@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/calmecac-dev/voluta/reader/rtf"
-	"github.com/calmecac-dev/voluta/writer/markdown"
+	"github.com/calmecac-dev/voluta"
 )
 
 func main() {
@@ -20,17 +19,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	doc, err := rtf.Read(data)
+	out, err := voluta.Convert(voluta.FormatRTF, voluta.FormatMarkdown, data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parseando RTF: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error convirtiendo: %v\n", err)
 		os.Exit(1)
 	}
 
-	md, err := markdown.Write(doc)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error convirtiendo a markdown: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(md)
+	fmt.Println(string(out))
 }

@@ -1,4 +1,3 @@
-// Package rtf implements a reader that converts RTF documents to Voluta's AST.
 package rtf
 
 import (
@@ -6,20 +5,29 @@ import (
 	"strconv"
 )
 
-type tokenType int
+// Token represents a single element in the RTF token tree.
+type Token struct {
+	Kind     TokenKind
+	Value    string // control word name or text content
+	Param    int
+	HasParam bool
+	Children []Token // only for TokenGroup
+}
+
+type TokenKind int
 
 const (
-	tokenGroupOpen  tokenType = iota // {
-	tokenGroupClose                  // }
-	tokenControl                     // \keyword or \keywordN
-	tokenText                        // literal text
+	TokenControlWord   TokenKind = iota // \keyword or \keywordN
+	TokenControlSymbol                  // single non-alpha char after \
+	TokenText                           // literal text
+	TokenGroup                          // { ... } — contains Children
 )
 
-type token struct {
-	kind     tokenType
-	value    string
-	param    int
-	hasParam bool
+// Tokenize parses RTF bytes into a token tree.
+// The top level is a slice of tokens (usually one root group).
+func Tokenize(data []byte) ([]Token, error) {
+	l := &lexer{src: data, pos: 0}
+	return l.tokenizeGroup()
 }
 
 type lexer struct {
@@ -27,21 +35,22 @@ type lexer struct {
 	pos int
 }
 
-func newLexer(data []byte) *lexer {
-	return &lexer{src: data, pos: 0}
-}
-
-func (l *lexer) tokenize() ([]token, error) {
-	var tokens []token
+// tokenizeGroup reads tokens until EOF or closing '}'.
+func (l *lexer) tokenizeGroup() ([]Token, error) {
+	var tokens []Token
 	for l.pos < len(l.src) {
 		ch := l.src[l.pos]
 		switch {
 		case ch == '{':
-			tokens = append(tokens, token{kind: tokenGroupOpen})
 			l.pos++
+			children, err := l.tokenizeGroup()
+			if err != nil {
+				return nil, err
+			}
+			tokens = append(tokens, Token{Kind: TokenGroup, Children: children})
 		case ch == '}':
-			tokens = append(tokens, token{kind: tokenGroupClose})
-			l.pos++
+			l.pos++ // consume closing brace
+			return tokens, nil
 		case ch == '\\':
 			tok, err := l.readControl()
 			if err != nil {
@@ -57,11 +66,11 @@ func (l *lexer) tokenize() ([]token, error) {
 	return tokens, nil
 }
 
-func (l *lexer) readControl() (token, error) {
+func (l *lexer) readControl() (Token, error) {
 	l.pos++ // consume '\'
 
 	if l.pos >= len(l.src) {
-		return token{}, fmt.Errorf("rtf: incomplete control word at end of file")
+		return Token{}, fmt.Errorf("rtf: incomplete control word at end of file")
 	}
 
 	ch := l.src[l.pos]
@@ -70,21 +79,21 @@ func (l *lexer) readControl() (token, error) {
 	if ch == '\'' {
 		l.pos++
 		if l.pos+2 > len(l.src) {
-			return token{}, fmt.Errorf("rtf: incomplete hex sequence")
+			return Token{}, fmt.Errorf("rtf: incomplete hex escape")
 		}
 		hex := string(l.src[l.pos : l.pos+2])
 		l.pos += 2
 		n, err := strconv.ParseInt(hex, 16, 32)
 		if err != nil {
-			return token{}, fmt.Errorf("rtf: invalid hex %q", hex)
+			return Token{}, fmt.Errorf("rtf: invalid hex %q", hex)
 		}
-		return token{kind: tokenText, value: string(rune(n))}, nil
+		return Token{Kind: TokenText, Value: string(rune(n))}, nil
 	}
 
-	// Single character control symbol
+	// Single character control symbol (non-alpha)
 	if !isLetter(ch) {
 		l.pos++
-		return token{kind: tokenControl, value: string(ch)}, nil
+		return Token{Kind: TokenControlSymbol, Value: string(ch)}, nil
 	}
 
 	// Control word: \keyword or \keywordN
@@ -92,9 +101,9 @@ func (l *lexer) readControl() (token, error) {
 	for l.pos < len(l.src) && isLetter(l.src[l.pos]) {
 		l.pos++
 	}
-	keyword := string(l.src[start:l.pos])
+	name := string(l.src[start:l.pos])
 
-	// Optional numeric parameter
+	// Optional numeric parameter (may be negative)
 	negative := false
 	if l.pos < len(l.src) && l.src[l.pos] == '-' {
 		negative = true
@@ -105,17 +114,17 @@ func (l *lexer) readControl() (token, error) {
 		l.pos++
 	}
 
-	tok := token{kind: tokenControl, value: keyword}
+	tok := Token{Kind: TokenControlWord, Value: name}
 	if l.pos > paramStart {
 		n, _ := strconv.Atoi(string(l.src[paramStart:l.pos]))
 		if negative {
 			n = -n
 		}
-		tok.param = n
-		tok.hasParam = true
+		tok.Param = n
+		tok.HasParam = true
 	}
 
-	// Consume delimiter space
+	// Consume optional space delimiter
 	if l.pos < len(l.src) && l.src[l.pos] == ' ' {
 		l.pos++
 	}
@@ -123,7 +132,7 @@ func (l *lexer) readControl() (token, error) {
 	return tok, nil
 }
 
-func (l *lexer) readText() token {
+func (l *lexer) readText() Token {
 	start := l.pos
 	for l.pos < len(l.src) {
 		ch := l.src[l.pos]
@@ -132,7 +141,7 @@ func (l *lexer) readText() token {
 		}
 		l.pos++
 	}
-	return token{kind: tokenText, value: string(l.src[start:l.pos])}
+	return Token{Kind: TokenText, Value: string(l.src[start:l.pos])}
 }
 
 func isLetter(ch byte) bool {
