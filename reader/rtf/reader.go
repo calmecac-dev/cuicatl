@@ -3,7 +3,7 @@ package rtf
 import (
 	"strings"
 
-	"github.com/calmecac-dev/voluta/ast"
+	"github.com/calmecac-dev/cuicatl/ast"
 )
 
 // Options configures the RTF reader behavior.

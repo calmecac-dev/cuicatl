@@ -3,8 +3,8 @@ package rtf_test
 import (
 	"testing"
 
-	"github.com/calmecac-dev/voluta/ast"
-	"github.com/calmecac-dev/voluta/reader/rtf"
+	"github.com/calmecac-dev/cuicatl/ast"
+	"github.com/calmecac-dev/cuicatl/reader/rtf"
 )
 
 func TestReadSimpleParagraph(t *testing.T) {

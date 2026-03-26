@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/calmecac-dev/voluta/scriv"
-	"github.com/calmecac-dev/voluta/writer/markdown"
+	"github.com/calmecac-dev/cuicatl/scriv"
+	"github.com/calmecac-dev/cuicatl/writer/markdown"
 )
 
 func main() {

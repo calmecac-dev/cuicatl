@@ -1,4 +1,4 @@
-package voluta
+package cuicatl
 
 import (
 	"fmt"
@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/calmecac-dev/voluta/ast"
-	rtfreader "github.com/calmecac-dev/voluta/reader/rtf"
-	"github.com/calmecac-dev/voluta/scriv"
-	htmlwriter "github.com/calmecac-dev/voluta/writer/html"
-	markdownwriter "github.com/calmecac-dev/voluta/writer/markdown"
+	"github.com/calmecac-dev/cuicatl/ast"
+	rtfreader "github.com/calmecac-dev/cuicatl/reader/rtf"
+	"github.com/calmecac-dev/cuicatl/scriv"
+	htmlwriter "github.com/calmecac-dev/cuicatl/writer/html"
+	markdownwriter "github.com/calmecac-dev/cuicatl/writer/markdown"
 )
 
 // Format identifies a document format.
@@ -51,7 +51,7 @@ func Read(format Format, data []byte, opts ...ReadOptions) (ast.Document, error)
 			ImageHandler: handler,
 		})
 	default:
-		return ast.Document{}, fmt.Errorf("voluta: unsupported read format %q", format)
+		return ast.Document{}, fmt.Errorf("cuicatl: unsupported read format %q", format)
 	}
 }
 
@@ -68,7 +68,7 @@ func Write(format Format, doc ast.Document, opts ...WriteOptions) ([]byte, error
 		out, err := htmlwriter.Write(doc)
 		return []byte(out), err
 	default:
-		return nil, fmt.Errorf("voluta: unsupported write format %q", format)
+		return nil, fmt.Errorf("cuicatl: unsupported write format %q", format)
 	}
 }
 
@@ -103,7 +103,7 @@ func ImportScriv(path string, opts ...ReadOptions) (ScrivProject, error) {
 func defaultImageHandler(dir string) func([]byte, string) (string, error) {
 	return func(data []byte, format string) (string, error) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("voluta: cannot create image dir: %w", err)
+			return "", fmt.Errorf("cuicatl: cannot create image dir: %w", err)
 		}
 		filename := fmt.Sprintf("img_%d.%s", time.Now().UnixNano(), format)
 		path := filepath.Join(dir, filename)

@@ -32,12 +32,12 @@ import (
     "log"
     "os"
 
-    "github.com/calmecac-dev/voluta"
+    "github.com/calmecac-dev/cuicatl"
 )
 
 data, _ := os.ReadFile("document.rtf")
 
-md, err := voluta.Convert(voluta.FormatRTF, voluta.FormatMarkdown, data)
+md, err := cuicatl.Convert(cuicatl.FormatRTF, cuicatl.FormatMarkdown, data)
 if err != nil {
     log.Fatal(err)
 }
@@ -50,20 +50,20 @@ fmt.Println(string(md))
 ```go
 data, _ := os.ReadFile("document.rtf")
 
-doc, err := voluta.Read(voluta.FormatRTF, data)
+doc, err := cuicatl.Read(cuicatl.FormatRTF, data)
 if err != nil {
     log.Fatal(err)
 }
 
 // Write to multiple formats from the same AST
-md, _   := voluta.Write(voluta.FormatMarkdown, doc)
-html, _ := voluta.Write(voluta.FormatHTML, doc)
+md, _   := cuicatl.Write(cuicatl.FormatMarkdown, doc)
+html, _ := cuicatl.Write(cuicatl.FormatHTML, doc)
 ```
 
 ### Import a Scrivener project
 
 ```go
-project, err := voluta.ImportScriv("MyNovel.scriv")
+project, err := cuicatl.ImportScriv("MyNovel.scriv")
 if err != nil {
     log.Fatal(err)
 }
@@ -74,7 +74,7 @@ for _, doc := range project.Documents {
     if !doc.IncludeInCompile {
         continue
     }
-    md, err := voluta.Write(voluta.FormatMarkdown, doc.Doc)
+    md, err := cuicatl.Write(cuicatl.FormatMarkdown, doc.Doc)
     if err != nil {
         log.Fatal(err)
     }
@@ -88,12 +88,12 @@ for _, doc := range project.Documents {
 data, _ := os.ReadFile("document.rtf")
 
 // Simple: provide a directory
-doc, err := voluta.Read(voluta.FormatRTF, data, voluta.ReadOptions{
+doc, err := cuicatl.Read(cuicatl.FormatRTF, data, cuicatl.ReadOptions{
     ImageDir: "assets/images",
 })
 
 // Advanced: full control over image storage
-doc, err := voluta.Read(voluta.FormatRTF, data, voluta.ReadOptions{
+doc, err := cuicatl.Read(cuicatl.FormatRTF, data, cuicatl.ReadOptions{
     ImageHandler: func(imgData []byte, format string) (string, error) {
         path := fmt.Sprintf("assets/%s.%s", uuid.New(), format)
         return path, os.WriteFile(path, imgData, 0644)
@@ -161,7 +161,7 @@ type ReadOptions struct {
 
 ## Architecture
 
-Voluta uses a two-phase pipeline:
+Cuicatl uses a two-phase pipeline:
 
 ```
 Input (RTF, .scriv)
@@ -179,7 +179,7 @@ The `ast.Document` is the central contract between readers and writers. Adding a
 
 ## Contributing
 
-Voluta is open source and welcomes contributions. Please open an issue before submitting a pull request for significant changes.
+Cuicatl is open source and welcomes contributions. Please open an issue before submitting a pull request for significant changes.
 
 ## License
 

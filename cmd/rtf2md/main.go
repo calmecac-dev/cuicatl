@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/calmecac-dev/voluta"
+	"github.com/calmecac-dev/cuicatl"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	out, err := voluta.Convert(voluta.FormatRTF, voluta.FormatMarkdown, data)
+	out, err := cuicatl.Convert(cuicatl.FormatRTF, cuicatl.FormatMarkdown, data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error convirtiendo: %v\n", err)
 		os.Exit(1)
