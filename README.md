@@ -1,10 +1,10 @@
-# Voluta
+# Cuicatl
 
-> A volute is a spiral ornament, resembling a snail shell, characteristic of Ionic and Composite capitals in classical architecture. In Mesoamerican codices, a similar spiral glyph — the *cuicatl* — represented the spoken word and human discourse. Voluta takes its name from both.
+> In Mesoamerican codices, the *cuicatl* represented the spoken word and human discourse.
 
-Voluta is a Go library for reading and converting creative writing document formats. It provides a clean, high-level API to read RTF documents and Scrivener projects, converting them to Markdown, HTML, and other formats through an intermediate AST.
+Cuicatl is a Go library for reading and converting creative writing document formats. It provides a clean, high-level API to read RTF documents and Scrivener projects, converting them to Markdown, HTML, and other formats through an intermediate AST.
 
-Voluta is the backbone of [Tlahtolli](https://github.com/tlahtolli-app/tlahtolli), a free and open source creative writing editor, but is completely independent and available for any Go project.
+Cuicatl is the backbone of [Tlahtolli](https://github.com/tlahtolli-app/tlahtolli), a free and open source creative writing editor, but is completely independent and available for any Go project.
 
 ## Features
 
@@ -17,7 +17,7 @@ Voluta is the backbone of [Tlahtolli](https://github.com/tlahtolli-app/tlahtolli
 ## Installation
 
 ```bash
-go get github.com/calmecac-dev/voluta
+go get github.com/calmecac-dev/cuicatl
 ```
 
 Requires Go 1.23 or later.
