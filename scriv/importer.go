@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/calmecac-dev/voluta/ast"
-	"github.com/calmecac-dev/voluta/reader/rtf"
+	"github.com/calmecac-dev/cuicatl/ast"
+	"github.com/calmecac-dev/cuicatl/reader/rtf"
 )
 
 // Project represents an imported Scrivener project.

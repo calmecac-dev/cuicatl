@@ -4,7 +4,7 @@ package markdown
 import (
 	"strings"
 
-	"github.com/calmecac-dev/voluta/ast"
+	"github.com/calmecac-dev/cuicatl/ast"
 )
 
 // Write converts an ast.Document to Markdown text.

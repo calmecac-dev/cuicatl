@@ -1,17 +1,26 @@
 # Changelog
 
-All notable changes to Voluta will be documented in this file.
+All notable changes to Cuicatl will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.1-alpha] - 2026-03-26
+
+### Changed
+- Renamed project from Voluta to Cuicatl — all packages, imports, and references updated
+- Module path changed from `github.com/calmecac-dev/voluta` to `github.com/calmecac-dev/cuicatl`
+- High-level API file renamed from `voluta.go` to `cuicatl.go`
+- Repository moved to `github.com/calmecac-dev/cuicatl`
+
+[0.1.1-alpha]: https://github.com/calmecac-dev/cuicatl/releases/tag/v0.1.1-alpha
 
 ## [0.1.0-alpha] - 2026-03-23
 
 Initial alpha release. Core RTF reading and Scrivener importing pipeline.
 
 ### Added
-
-**High-level API (`voluta.go`)**
+**High-level API (`cuicatl.go`)**
 - `Read(format, data, opts)` — converts raw bytes to `ast.Document`
 - `Write(format, doc, opts)` — converts `ast.Document` to target format
 - `Convert(from, to, data, opts)` — reads and writes in a single step
@@ -58,4 +67,4 @@ Initial alpha release. Core RTF reading and Scrivener importing pipeline.
 - Markdown reader not yet implemented
 - PDF, docx, and ePub writers not yet implemented
 
-[0.1.0-alpha]: https://github.com/calmecac-dev/voluta/releases/tag/v0.1.0-alpha
+[0.1.0-alpha]: https://github.com/calmecac-dev/cuicatl/releases/tag/v0.1.0-alpha

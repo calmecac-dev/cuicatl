@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/calmecac-dev/voluta/ast"
+	"github.com/calmecac-dev/cuicatl/ast"
 )
 
 var (
